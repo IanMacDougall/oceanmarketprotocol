@@ -1,4 +1,4 @@
-interface Order {
+interface TxOrder {
   tx: string
   serviceIndex: number
   createdTimestamp: number
@@ -24,7 +24,7 @@ interface TransactionHistory {
     publishMarketFeeAddress: string
     publishMarketFeeToken: string
     publishMarketFeeAmount: string
-    orders: Order[]
+    orders: TxOrder[]
     dispensers: [
       {
         id: string

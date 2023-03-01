@@ -15,6 +15,7 @@ import {
   getPublishedAssets,
   getUserSales
 } from '@utils/aquarius'
+import { getAccessTokens, getUserData } from '@utils/accessTokens'
 import axios, { CancelToken } from 'axios'
 import web3 from 'web3'
 import { useMarketMetadata } from '../MarketMetadata'
@@ -30,6 +31,7 @@ interface ProfileProviderValue {
   isDownloadsLoading: boolean
   sales: number
   ownAccount: boolean
+  accessTokens: UserData
 }
 
 const ProfileContext = createContext({} as ProfileProviderValue)
@@ -231,6 +233,74 @@ function ProfileProvider({
     getUserSalesNumber()
   }, [accountId, chainIds])
 
+  //
+  // ACCESS TOKENS
+  //
+  const [accessTokens, setAccessTokens] = useState<AccessToken[]>()
+  const fetchAccessTokens = useCallback(
+    async (cancelToken: CancelToken) => {
+      if (!accountId || !chainIds) return
+
+      const dtList: string[] = []
+      const tokenOrders = await getUserTokenOrders(accountId, chainIds)
+
+      LoggerInstance.log(`[profile - AssetToken] assetsTotal = ${assetsTotal}.`)
+
+      LoggerInstance.log(
+        `[profile - AssetTokens] Fetched ${tokenOrders.length} tokenOrders.`,
+        tokenOrders
+      )
+
+      for (let i = 0; i < tokenOrders?.length; i++) {
+        dtList.push(tokenOrders[i].datatoken.address)
+      }
+
+      const accessTokens = await getAccessTokens(
+        dtList,
+        tokenOrders,
+        chainIds,
+        cancelToken,
+        ownAccount
+      )
+      setAccessTokens(accessTokens)
+
+      LoggerInstance.log(
+        `[profile - AssetToken] Fetched ${accessTokens.length} access tokens.`,
+        accessTokens
+      )
+    },
+    [accountId, assetsTotal, chainIds, ownAccount]
+  )
+
+  useEffect(() => {
+    const cancelTokenSource = axios.CancelToken.source()
+
+    async function getAccessTokens() {
+      if (!appConfig?.metadataCacheUri) return
+
+      try {
+        setIsDownloadsLoading(true)
+        await fetchAccessTokens(cancelTokenSource.token)
+      } catch (err) {
+        LoggerInstance.log(err.message)
+      } finally {
+        setIsDownloadsLoading(false)
+      }
+    }
+    getAccessTokens()
+
+    if (downloadsInterval) return
+    const interval = setInterval(async () => {
+      await fetchAccessTokens(cancelTokenSource.token)
+    }, refreshInterval)
+    setDownloadsInterval(interval)
+
+    return () => {
+      cancelTokenSource.cancel()
+      clearInterval(downloadsInterval)
+    }
+  }, [fetchAccessTokens, appConfig.metadataCacheUri, downloadsInterval])
+
   return (
     <ProfileContext.Provider
       value={{
@@ -242,7 +312,8 @@ function ProfileProvider({
         downloadsTotal,
         isDownloadsLoading,
         ownAccount,
-        sales
+        sales,
+        accessTokens
       }}
     >
       {children}

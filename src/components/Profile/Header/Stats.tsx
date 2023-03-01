@@ -99,6 +99,7 @@ export default function Stats({
         }
       />
       <NumberUnit label="Organization" value="N/A" />
+      <div>{assets?.length}</div>
     </div>
   )
 }
